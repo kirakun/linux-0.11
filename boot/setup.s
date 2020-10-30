@@ -26,30 +26,30 @@ begdata:
 .bss
 begbss:
 .text
-
+! 刚开始读取各种硬件配置（显卡、内存、硬盘）保存在之前bootsect的位置0x90000 boot模块代码被废弃
 entry start
 start:
 
 ! ok, the read went well so we get current cursor position and save it for
-! posterity.
+! posterity.  
 
 	mov	ax,#INITSEG	! this is done in bootsect already, but...
 	mov	ds,ax
 	mov	ah,#0x03	! read cursor pos
 	xor	bh,bh
 	int	0x10		! save it in known place, con_init fetches
-	mov	[0],dx		! it from 0x90000.
+	mov	[0],dx		! it from 0x90000. 获取光标位置存在0x90000
 ! Get memory size (extended mem, kB)
 
 	mov	ah,#0x88
 	int	0x15
-	mov	[2],ax
+	mov	[2],ax  !获取内存信息存在 0x90002处
 
 ! Get video-card data:
 
 	mov	ah,#0x0f
 	int	0x10
-	mov	[4],bx		! bh = display page
+	mov	[4],bx		! bh = display page  显卡信息
 	mov	[6],ax		! al = video mode, ah = window width
 
 ! check for EGA/VGA and some config parameters
@@ -103,10 +103,15 @@ no_disk1:
 	stosb
 is_disk1:
 
-! now we want to move to protected mode ...
+! now we want to move to protected mode ... 开启保护模式
 
-	cli			! no interrupts allowed !
-
+	cli			! no interrupts allowed ! 禁用中断
+;// 首先我们将system 模块移到正确的位置。
+;// bootsect 引导程序是将system 模块读入到从10000（64k）开始的位置。由于当时假设
+;// system 模块最大长度不会超过80000（512k），也即其末端不会超过内存地址90000，
+;// 所以bootsect 会将自己移动到90000 开始的地方，并把setup 加载到它的后面。
+;// 下面这段程序的用途是再把整个system 模块移动到00000 位置，即把从10000 到8ffff
+;// 的内存数据块(512k)，整块地向内存低端移动了10000（64k）的位置。
 ! first we move the system to it's rightful place
 
 	mov	ax,#0x0000
@@ -186,9 +191,9 @@ end_move:
 ! things as simple as possible, we do no register set-up or anything,
 ! we let the gnu-compiled 32-bit programs do that. We just jump to
 ! absolute address 0x00000, in 32-bit protected mode.
-	mov	ax,#0x0001	! protected mode (PE) bit
-	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+	mov	ax,#0x0001	! protected mode (PE) bit ;// 保护模式比特位(PE)。
+	lmsw	ax		! This is it!  加载机器状态字控制寄存器CR0，其比特位0 置1 将导致CPU 工作在保护模式。
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs)   此时已经是保护模式了，cs=8说明index=1,ti=0 说明需要从gdt表获取段基地址 查gdt表知道这行代码是跳转到0x00000地址
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
@@ -218,8 +223,8 @@ idt_48:
 	.word	0,0			! idt base=0L
 
 gdt_48:
-	.word	0x800		! gdt limit=2048, 256 GDT entries
-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
+	.word	0x800		! gdt limit=2048, 256 GDT entries  最大长度2kb
+	.word	512+gdt,0x9	! gdt base = 0X9xxxx   32位地址 0x0009xxxxx 也就是gdt的内存地址
 	
 .text
 endtext:
