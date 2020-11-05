@@ -574,7 +574,11 @@ void sched_init(void)
 /* Clear NT, so that we won't have troubles with that later on */
     // NT标志用于控制程序的递归调用(Nested Task)。当NT置位时，那么当前中断任务执行
     // iret指令时就会引起任务切换。NT指出TSS中的back_link字段是否有效。
+    //1.首先用pushfl指令将标志寄存器压栈
+	//2.然后通过栈顶指针sp来修改刚才压栈的标志寄存器
+	//3.然后将栈顶的内容弹出到标志寄存器中，完成修改
 	__asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");        // 复位NT标志
+	//gdt表中第4、5项分别是tss0和ldt0 下面这两行代码的作用是将tss0 ldt0加载到寄存器tr ldtr
 	ltr(0);
 	lldt(0);
     // 下面代码用于初始化8253定时器。通道0，选择工作方式3，二进制计数方式。通道0的

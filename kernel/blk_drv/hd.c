@@ -32,7 +32,7 @@ inb_p(0x71); \
 
 /* Max read/write errors/sector */
 #define MAX_ERRORS	7
-#define MAX_HD		2
+#define MAX_HD		2  //最多两个硬盘
 
 static void recal_intr(void);
 
@@ -50,12 +50,12 @@ struct hd_i_struct hd_info[] = { HD_TYPE };
 #define NR_HD ((sizeof (hd_info))/(sizeof (struct hd_i_struct)))
 #else
 struct hd_i_struct hd_info[] = { {0,0,0,0,0,0},{0,0,0,0,0,0} };
-static int NR_HD = 0;
+static int NR_HD = 0;  //硬盘数量
 #endif
 
 static struct hd_struct {
-	long start_sect;
-	long nr_sects;
+	long start_sect; //起始扇区号
+	long nr_sects;   //总的扇区数
 } hd[5*MAX_HD]={{0,0},};
 
 #define port_read(port,buf,nr) \
@@ -81,23 +81,24 @@ int sys_setup(void * BIOS)
 	callable = 0;
 #ifndef HD_TYPE
 	for (drive=0 ; drive<2 ; drive++) {
-		hd_info[drive].cyl = *(unsigned short *) BIOS;
-		hd_info[drive].head = *(unsigned char *) (2+BIOS);
+		hd_info[drive].cyl = *(unsigned short *) BIOS;  //柱面数
+		hd_info[drive].head = *(unsigned char *) (2+BIOS);  //磁头数
 		hd_info[drive].wpcom = *(unsigned short *) (5+BIOS);
 		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
 		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
-		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
+		hd_info[drive].sect = *(unsigned char *) (14+BIOS);  //每磁道扇区数
 		BIOS += 16;
 	}
 	if (hd_info[1].cyl)
-		NR_HD=2;
+		NR_HD=2;  //第二个hd_info有柱面 说明存在第二个硬盘
 	else
 		NR_HD=1;
 #endif
+	//一个硬盘最多分四个逻辑盘 0是物理盘 1~4是逻辑盘 hd数组是这么记录的:0物理盘 1~4逻辑盘
 	for (i=0 ; i<NR_HD ; i++) {
-		hd[i*5].start_sect = 0;
+		hd[i*5].start_sect = 0;  //起始扇区号
 		hd[i*5].nr_sects = hd_info[i].head*
-				hd_info[i].sect*hd_info[i].cyl;
+				hd_info[i].sect*hd_info[i].cyl;  //柱面*磁头*扇区 == 整个硬盘的扇区数
 	}
 
 	/*
@@ -133,6 +134,8 @@ int sys_setup(void * BIOS)
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
+	//第一个硬盘的设备号是0x300 第二个硬盘的设备号是0x305 函数break读取硬盘的某个block 这里读取第0个block（引导块）有分区信息 
+	//所以这里的代码是获取逻辑分区信息 然后填充hd数组的1~4位置的数据
 	for (drive=0 ; drive<NR_HD ; drive++) {
 		if (!(bh = bread(0x300 + drive*5,0))) {
 			printk("Unable to read partition table of drive %d\n\r",

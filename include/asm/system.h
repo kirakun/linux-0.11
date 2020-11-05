@@ -1,12 +1,12 @@
-#define move_to_user_mode() \
+#define move_to_user_mode() \     //整个过程是模仿中断返回 特权级翻转
 __asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
-	"iret\n" \
-	"1:\tmovl $0x17,%%eax\n\t" \
+	"pushl $0x17\n\t" \          //0x17=10111(index=2,dpl=3,tl=1) 也就是特权级3 ldt 内核数据段 压栈ss
+	"pushl %%eax\n\t" \          //栈顶指针压栈
+	"pushfl\n\t" \               //eflag寄存器压栈
+	"pushl $0x0f\n\t" \          //0x0f=01111(index=1,dpl=3,tl=1) 也就是特权级3 ldt 内核代码段 压栈cs
+	"pushl $1f\n\t" \            //$1f 指的是标号1那行代码的地址
+	"iret\n" \                   //中断返回 恢复现场 翻转特权级从0到3
+	"1:\tmovl $0x17,%%eax\n\t" \  //下面的代码使得 ds es fs gs的值跟ax一致 都是0x17 都是指向内核数据段
 	"movw %%ax,%%ds\n\t" \
 	"movw %%ax,%%es\n\t" \
 	"movw %%ax,%%fs\n\t" \
